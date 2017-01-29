@@ -3,12 +3,13 @@
 
 #include <tuple>
 #include <functional>
+#include <iostream>
 
 template <class F, class... First_arg>
-class bind_t {
+struct my_bind_t {
 
 template <class FF, class... Args>
-friend bind_t bind(FF&& f, Args&&... args);
+friend my_bind_t<FF, Args ...> my_bind(FF&& f, Args&&... args);
 
 public:
 	template < class... New_args>
@@ -19,7 +20,7 @@ private:
 	F f;
 	std::tuple<First_arg...> tuple;
 
-	bind_t(F&& f, std::tuple<First_arg...>&& tuple) : f(std::forward<F>(f)),
+	my_bind_t(F&& f, std::tuple<First_arg...>&& tuple) : f(std::forward<F>(f)),
 	tuple(std::forward<std::tuple<First_arg...>>(tuple)) {}
 
 	template<size_t... Hs>
@@ -40,19 +41,28 @@ private:
 		return old_arg;
 	}
 
-	template<size_t N, class... New_args>
-	decltype(auto) get(std::_Placeholder<N>, New_args&& ... new_args) const {
+	template<int N, class... New_args>
+	auto&& get(std::_Placeholder<N> const&, New_args&& ... new_args) const {
 		return std::get<N - 1>(std::forward_as_tuple(new_args...));
+	}
+
+	template<int N, class... New_args, class H, class... Hs>
+	auto get(my_bind_t<H, Hs...>& rhs, New_args&& ...  new_args) const {
+		return rhs(std::forward<New_args>(new_args)...);
 	}
 
 	template<size_t... Indexes, class ... New_args>
 	auto call(seq<Indexes...>, New_args&& ... new_args) {
-		return f(arg_get(std::get<Indexes>(tuple), new_args...)...);
+		return f(get(std::get<Indexes>(tuple), new_args...)...);
 	}
 };
-template <class R, class F, class... Args>
-bind_t<F, Args...> bind(F&& f, Args&&... args ) {
-	return bind_t<F, Args...>(std::forward<F>(f), 
-		std::tuple<Args...>(std::forward<Args...>(args)...));
+
+
+template <class F, class... Args>
+my_bind_t<F, Args...> my_bind(F&& f, Args&&... args){
+	return my_bind_t<F, Args...>(std::forward<F>(f), 
+		std::tuple<Args...>(std::forward<Args>(args)...));
+
+	//std::cout << get(std::placeholders::_1, 1) << std::endl;
 } 
 #endif
