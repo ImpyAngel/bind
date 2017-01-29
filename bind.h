@@ -1,5 +1,5 @@
-#ifndef BIND.H
-#define BIND.H
+#ifndef BIND_H
+#define BIND_H
 
 #include <tuple>
 #include <functional>
@@ -51,7 +51,7 @@ private:
 	}
 };
 template <class R, class F, class... Args>
-bind_t<F, Args...> bind(F&& f, Args&&... args ){
+bind_t<F, Args...> bind(F&& f, Args&&... args ) {
 	return bind_t<F, Args...>(std::forward<F>(f), 
 		std::tuple<Args...>(std::forward<Args...>(args)...));
 } 
