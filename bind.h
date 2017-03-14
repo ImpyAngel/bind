@@ -4,75 +4,66 @@
 
 #include <tuple>
 #include <functional>
+#include <iostream>
 
-template<class F, class... WAS>
-class my_bind_type {
-    template<class F_, class... Old_Args_>
-    friend my_bind_type<F_, Old_Args_...> my_bind(F_&&, Old_Args_&& ...);
+
+template <typename F, typename ...Args>
+struct my_bind_t {
 
 public:
-    template<class... New_Args>
-    auto operator()(New_Args&& ... new_args) {
-        return call(typename tuple_seq_generator<std::tuple_size<tuple_t>::value>::type(),
-                    std::forward<New_Args>(new_args)...);
+
+    my_bind_t(F&& f, Args&&... args) :
+            func(std::forward<F>(f)), args(std::forward<Args>(args)...)
+    {}
+
+    template <typename ... New_args>
+    auto operator() (New_args&& ...new_args) {
+        return call_f(typename seq_generator<std::tuple_size<std::tuple<Args...>>::value>::type(), std::forward<New_args>(new_args)...);
     }
 
 private:
-    typedef F func_t;
-    typedef std::tuple<WAS...> tuple_t;
 
-    func_t f;
-    tuple_t tuple;
+    std::tuple<typename std::decay<Args>::type...> args;
+    typename std::decay<F>::type func;
 
-    my_bind_type(F&& f, std::tuple<WAS...>&& tuple) : f(std::forward<F>(f)),
-                                                           tuple(std::forward<tuple_t>(tuple))
-    {}
+    template <int... sequence>
+    struct seq_generator_t {};
 
-    template<size_t... Indexes>
-    struct tuple_seq_t {};
-
-
-    template<size_t Head, size_t... Indexes>
-    struct tuple_seq_generator {
-        typedef typename tuple_seq_generator<Head - 1, Head - 1, Indexes...>::type type;
+    template <int first, int ...other>
+    struct seq_generator {
+        typedef typename seq_generator<first - 1, first - 1, other...>::type type;
     };
 
-
-    template<size_t... Indexes>
-    struct tuple_seq_generator<0, Indexes...> {
-        typedef tuple_seq_t<Indexes...> type;
+    template <int ...other>
+    struct seq_generator<0, other...> {
+        typedef seq_generator_t<other...> type;
     };
 
-
-    template<class Old_Arg, class... New_Args>
-    Old_Arg&& arg_get(Old_Arg&& old_arg, New_Args&& ...) const {
-        return old_arg;
+    template <typename That_arg, typename ...New_args>
+    auto&& arg_get(That_arg& that_arg, New_args& ...new_args) {
+        return that_arg;
     }
 
-    template<int N, class... New_Args>
-    auto&& arg_get(std::_Placeholder<N>, New_Args&& ... new_args) const {
+    template <int N, typename ...New_args>
+    auto&& arg_get(std::_Placeholder<N> plh, New_args& ...new_args) {
         return std::get<N - 1>(std::forward_as_tuple(new_args...));
     }
 
-    template<class New_Function, class... Another_Args, class... New_Args>
-    auto arg_get(my_bind_type<New_Function, Another_Args...>& another_bind, New_Args&& ... new_args) const {
-        return another_bind(std::forward<New_Args>(new_args)...);
+    template <typename Other_func, typename ...Other_args, typename ...New_args>
+    auto arg_get(my_bind_t<Other_func, Other_args...> & other_bind, New_args& ...new_args) {
+        return other_bind(new_args...);
     }
 
-
-    template<size_t... Indexes, class... New_Args>
-    auto call(tuple_seq_t<Indexes...>, New_Args&& ... new_args) {
-        return f(arg_get(std::get<Indexes>(tuple),
-                         new_args...)...);
+    template <int ...N, typename ...New_args>
+    auto call_f(const seq_generator_t<N...>& sequence, New_args&& ...new_args) {
+        return func(arg_get(std::get<N>(args), new_args...)...);
     }
 
 };
 
-
-template<class F, class... WAS>
-my_bind_type<F, WAS...> my_bind(F&& f, WAS&& ... args) {
-    return my_bind_type<F, WAS...>(std::forward<F>(f),
-                                        std::tuple<WAS...>(std::forward<WAS>(args)...));
+template <typename F, typename ...Args>
+my_bind_t<F, Args...> my_bind(F&& f, Args&&... args) {
+    return my_bind_t<F, Args...>(std::forward<F>(f), std::forward<Args>(args)...);
 }
 
 #endif //BIND_HWW
